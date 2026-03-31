@@ -14,8 +14,11 @@ const apiUrl = (path) => `${API_BASE}${path}`;
 
 async function apiGet(path) {
   const res = await fetch(apiUrl(path));
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const text = await res.text();
+  let payload = null;
+  try { payload = text ? JSON.parse(text) : null; } catch (_) {}
+  if (!res.ok) throw new Error(payload?.error || text || 'Request failed');
+  return payload ?? {};
 }
 
 async function apiSend(path, method, body) {
@@ -24,17 +27,11 @@ async function apiSend(path, method, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body || {})
   });
-  if (!res.ok) {
-    let err = 'Request failed';
-    try {
-      const payload = await res.json();
-      err = payload.error || JSON.stringify(payload);
-    } catch (_) {
-      err = await res.text();
-    }
-    throw new Error(err);
-  }
-  return res.json();
+  const text = await res.text();
+  let payload = null;
+  try { payload = text ? JSON.parse(text) : null; } catch (_) {}
+  if (!res.ok) throw new Error(payload?.error || text || 'Request failed');
+  return payload ?? {};
 }
 
 function money(n) {
@@ -218,7 +215,10 @@ function getCustomerSession() {
 
 function requireCustomerSession() {
   const session = getCustomerSession();
-  if (!session) {
+  const tableId = Number(session?.table_id || 0);
+  const name = String(session?.name || '').trim();
+  if (!session || !tableId || tableId <= 0 || !name) {
+    localStorage.removeItem('customer_session');
     window.location.href = '/frontend/login/customer-login.html';
     return null;
   }
@@ -345,9 +345,15 @@ function adminSidebar(current = '') {
 function requireStaff(role = 'admin') {
   const session = store.read('staff_session', null);
   if (!session) {
-    const fallback = { role, name: role === 'cook' ? 'Cook' : 'Admin', loginAt: new Date().toISOString() };
-    store.write('staff_session', fallback);
-    return fallback;
+    window.location.href = '/frontend/login/staff-login.html';
+    return { role: 'guest' };
+  }
+
+  const expected = String(role || '').trim().toLowerCase();
+  const actual = String(session.role || '').trim().toLowerCase();
+  if (expected && actual && expected !== actual) {
+    window.location.href = '/frontend/login/staff-login.html';
+    return { role: 'guest' };
   }
   return session;
 }

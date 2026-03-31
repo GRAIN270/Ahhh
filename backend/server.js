@@ -28,6 +28,47 @@ let menuOptionDefaultsEnsured = false;
 const webRootDir = path.join(__dirname, '..');
 app.use(express.static(webRootDir));
 
+// Friendly page routes
+const pageRoutes = {
+  '/': 'frontend/login/customer-login.html',
+  '/customer-login': 'frontend/login/customer-login.html',
+  '/staff-login': 'frontend/login/staff-login.html',
+
+  '/customer-dashboard': 'frontend/User/customer-dashboard.html',
+  '/menu-detail': 'frontend/User/menu-detail.html',
+  '/cart': 'frontend/User/cart.html',
+  '/my-orders': 'frontend/User/my-orders.html',
+  '/payment': 'frontend/User/payment.html',
+
+  '/admin': 'frontend/admin/dashboard_Admin.html',
+  '/admin/dashboard': 'frontend/admin/dashboard_Admin.html',
+  '/admin/menu-items': 'frontend/admin/menu-items.html',
+  '/admin/orders': 'frontend/admin/orders.html',
+  '/admin/order-detail': 'frontend/admin/order-detail.html',
+  '/admin/payments': 'frontend/admin/payments.html',
+  '/admin/reviews': 'frontend/admin/reviews.html',
+  '/admin/profile': 'frontend/admin/profile.html',
+  '/admin/attendance': 'frontend/admin/attendance.html',
+  '/admin/cooks': 'frontend/admin/cooks.html',
+
+  '/cook': 'frontend/cook/ck-dsb.html',
+  '/cook/dashboard': 'frontend/cook/ck-dsb.html',
+  '/cook/orders': 'frontend/cook/ck-od.html',
+
+  '/cashier': 'frontend/cashier/Cashier.html'
+};
+
+Object.entries(pageRoutes).forEach(([route, relativePath]) => {
+  app.get(route, (_req, res) => {
+    res.sendFile(path.join(webRootDir, relativePath));
+  });
+});
+
+// Shared frontend helper path for friendly routes (e.g. /customer-login uses ../app.js -> /app.js)
+app.get('/app.js', (_req, res) => {
+  res.sendFile(path.join(webRootDir, 'frontend/app.js'));
+});
+
 const normalizeMethod = (method = '') => {
   const m = String(method).trim().toUpperCase();
   if (m === 'CASH') return 'CASH';
@@ -86,6 +127,45 @@ function getOptionTemplatesByCategoryId(categoryId) {
       ]
     }
   ];
+}
+
+async function authenticateStaff({ username, password, role }) {
+  const user = String(username || '').trim();
+  const pass = String(password || '').trim();
+  const targetRole = String(role || '').trim().toLowerCase();
+  if (!user || !pass) return null;
+
+  if (!targetRole || targetRole === 'cook') {
+    const [cookRows] = await pool.query(
+      'SELECT cook_id, username, status FROM cooks WHERE username = ? AND password = ? LIMIT 1',
+      [user, pass]
+    );
+    const cook = cookRows[0];
+    if (cook && String(cook.status || '').toUpperCase() === 'ACTIVE') {
+      return {
+        role: 'cook',
+        staff_id: `CK-${String(cook.cook_id).padStart(2, '0')}`,
+        name: cook.username
+      };
+    }
+  }
+
+  if (!targetRole || targetRole === 'admin') {
+    const [adminRows] = await pool.query(
+      'SELECT admin_id, username FROM admin WHERE username = ? AND password = ? LIMIT 1',
+      [user, pass]
+    );
+    const admin = adminRows[0];
+    if (admin) {
+      return {
+        role: 'admin',
+        staff_id: `AD-${String(admin.admin_id).padStart(2, '0')}`,
+        name: admin.username
+      };
+    }
+  }
+
+  return null;
 }
 
 async function ensureMenuOptionDefaults() {
@@ -271,6 +351,47 @@ async function getMenuBundle() {
 }
 
 // --- CUSTOMER APIs ---
+
+app.post('/api/auth/staff/login', async (req, res) => {
+  try {
+    const { username, password, role } = req.body || {};
+    const session = await authenticateStaff({ username, password, role });
+    if (!session) return res.status(401).json({ error: 'Invalid credentials' });
+    res.json({ status: 'success', session: { ...session, loginAt: new Date().toISOString() } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/customer/login', async (req, res) => {
+  try {
+    const { table_id, name } = req.body || {};
+    const tableId = Number(table_id || 0);
+    const username = String(name || '').trim();
+    if (!tableId || !username) {
+      return res.status(400).json({ error: 'table_id and name are required' });
+    }
+
+    const [tableRows] = await pool.query(
+      'SELECT table_id, table_number FROM tables WHERE table_id = ? OR table_number = ? LIMIT 1',
+      [tableId, tableId]
+    );
+    const table = tableRows[0];
+    if (!table) return res.status(404).json({ error: 'Table not found' });
+
+    res.json({
+      status: 'success',
+      session: {
+        table_id: Number(table.table_id),
+        table_number: Number(table.table_number),
+        name: username,
+        loginAt: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/customer/menu', async (req, res) => {
   try {

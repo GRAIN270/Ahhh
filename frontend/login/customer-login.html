@@ -138,18 +138,15 @@
     if (!name) return alert("Please enter your name.");
 
     try {
-      const tables = await apiGet("/api/cashier/tables");
-      const exists = (tables || []).some((t) => Number(t.table_id) === tableId || Number(t.table_number) === tableId);
-      if (!exists) return alert("Table not found in database.");
-    } catch (_) {}
-
-    localStorage.setItem("customer_session", JSON.stringify({
-      table_id: tableId,
-      table_number: tableId,
-      name,
-      loginAt: new Date().toISOString()
-    }));
-    window.location.href = "/frontend/User/customer-dashboard.html";
+      const result = await apiSend('/api/auth/customer/login', 'POST', {
+        table_id: tableId,
+        name
+      });
+      localStorage.setItem("customer_session", JSON.stringify(result.session));
+      window.location.href = "/frontend/User/customer-dashboard.html";
+    } catch (err) {
+      alert(err.message || "Login failed");
+    }
   };
 </script>
 </body>

@@ -24,6 +24,7 @@
       </label>
     </div>
     <div class="flex-none gap-2">
+      <div id="customer-info" class="hidden md:flex badge bg-white border border-[#d8ccb9] text-[#6d2f1d] px-4 py-3"></div>
       <a href="cart.html" class="btn btn-ghost btn-circle hover:bg-orange-100">
         <div class="indicator">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#6d2f1d]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m1.6 8L5.4 5M7 13l-1.3 1.3A1 1 0 006.4 16H19m-12 0a2 2 0 104 0m6 0a2 2 0 104 0"/></svg>
@@ -70,7 +71,10 @@
 
   <script src="../app.js"></script>
   <script>
-    requireCustomerSession();
+    const customerSession = requireCustomerSession();
+    if (!customerSession) {
+      window.location.href = "/frontend/login/customer-login.html";
+    }
 
     const tabs = document.getElementById("tabs");
     const grid = document.getElementById("grid");
@@ -78,6 +82,12 @@
     const sub = document.getElementById("sub");
     const search1 = document.getElementById("search1");
     const search2 = document.getElementById("search2");
+    const info = document.getElementById("customer-info");
+
+    if (customerSession) {
+      info.textContent = `${customerSession.name} · Table ${String(customerSession.table_number || customerSession.table_id).padStart(2, '0')}`;
+      info.classList.remove("hidden");
+    }
 
     let cats = [];
     let data = {};
