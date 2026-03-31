@@ -2,7 +2,7 @@
 <html lang="en" data-theme="cupcake">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Orders</title>
+  <title>My Reviews</title>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <style>
@@ -13,15 +13,16 @@
     .fh-btn{background:var(--fh-orange)!important;border:none!important;color:#fff!important;border-radius:9999px}
     .fh-btn:hover{background:var(--fh-orange-2)!important}
     .fh-outline{background:#fff!important;border:1px solid #c8b39b!important;color:var(--fh-brown)!important;border-radius:9999px}
-    .fh-order-btn{min-width:140px;font-weight:700}
   </style>
 </head>
 <body class="min-h-screen">
-  <!-- top bar -->
   <div class="navbar sticky top-0 z-50 px-4 lg:px-8 min-h-16 fh-top">
-    <div class="flex-1 items-center gap-2"><a href="customer-dashboard.html" class="btn btn-ghost btn-circle text-xl text-[#6d2f1d]">‹</a><div class="text-2xl font-extrabold text-orange-600">My Orders</div></div>
-    <div class="flex-none flex items-center gap-2">
-      <a href="/customer-reviews" class="btn fh-outline">Reviews</a>
+    <div class="flex-1 items-center gap-2">
+      <a href="customer-dashboard.html" class="btn btn-ghost btn-circle text-xl text-[#6d2f1d]">&lt;</a>
+      <div class="text-2xl font-extrabold text-orange-600">My Reviews</div>
+    </div>
+    <div class="flex-none gap-2">
+      <a href="my-orders.html" class="btn fh-outline">My Orders</a>
       <a href="cart.html" class="btn btn-ghost btn-circle hover:bg-orange-100">
         <div class="indicator">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#6d2f1d]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m1.6 8L5.4 5M7 13l-1.3 1.3A1 1 0 006.4 16H19m-12 0a2 2 0 104 0m6 0a2 2 0 104 0"/></svg>
@@ -31,40 +32,38 @@
     </div>
   </div>
 
-  <main class="max-w-5xl mx-auto p-4 lg:p-8 space-y-4">
-    <div class="flex justify-between items-center gap-4">
-      <div><h1 class="text-3xl font-extrabold text-[#3d241a]">Order History</h1><p class="text-[#8b6b5c]">Your paid orders appear here.</p></div>
-      <button id="order-more-btn" class="btn fh-btn fh-order-btn">Order More</button>
-    </div>
-
+  <main class="max-w-6xl mx-auto p-4 lg:p-8 space-y-4">
     <div class="fh-card">
       <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-3">
         <div class="rounded-2xl border border-[#efe5d7] p-4">
-          <div class="text-sm text-[#8b6b5c]">Total Orders</div>
-          <div id="sum-orders" class="text-2xl font-extrabold text-[#3d241a]">0</div>
+          <div class="text-sm text-[#8b6b5c]">Reviewed Items</div>
+          <div id="sum-reviewed" class="text-2xl font-extrabold text-[#3d241a]">0</div>
         </div>
         <div class="rounded-2xl border border-[#efe5d7] p-4">
-          <div class="text-sm text-[#8b6b5c]">Total Items</div>
-          <div id="sum-items" class="text-2xl font-extrabold text-[#3d241a]">0</div>
+          <div class="text-sm text-[#8b6b5c]">Pending Reviews</div>
+          <div id="sum-pending" class="text-2xl font-extrabold text-[#3d241a]">0</div>
         </div>
         <div class="rounded-2xl border border-[#efe5d7] p-4">
-          <div class="text-sm text-[#8b6b5c]">Grand Total</div>
-          <div id="sum-total" class="text-2xl font-extrabold text-orange-600">0.00 THB</div>
+          <div class="text-sm text-[#8b6b5c]">Average Rating</div>
+          <div id="sum-avg" class="text-2xl font-extrabold text-orange-600">0.0</div>
         </div>
       </div>
     </div>
 
-    <div id="empty" class="fh-card hidden"><div class="p-8 text-center"><h2 class="text-2xl font-bold text-[#3d241a]">No orders yet</h2><p class="text-[#8b6b5c]">Complete a payment to see your orders.</p><button id="order-empty-btn" class="btn fh-btn fh-order-btn mt-4">Order Now</button></div></div>
+    <div id="empty" class="fh-card hidden">
+      <div class="p-8 text-center">
+        <h2 class="text-2xl font-bold text-[#3d241a]">No completed orders yet</h2>
+        <p class="text-[#8b6b5c] mt-2">After your order is done, you can leave reviews here.</p>
+        <a href="customer-dashboard.html" class="btn fh-btn mt-4">Back to Menu</a>
+      </div>
+    </div>
     <div id="list" class="space-y-4"></div>
   </main>
 
-  <!-- review modal -->
   <dialog id="reviewModal" class="modal">
     <div class="modal-box max-w-lg fh-card">
       <h3 class="text-2xl font-extrabold text-[#3d241a]">Write Review</h3>
       <p id="reviewItem" class="text-[#8b6b5c] mt-1"></p>
-
-      <!-- star rating -->
       <div class="mt-4">
         <div class="text-sm font-semibold text-[#6d2f1d] mb-2">Rating</div>
         <div class="rating rating-lg">
@@ -75,13 +74,10 @@
           <input type="radio" name="reviewStars" class="mask mask-star-2 bg-orange-400" value="5">
         </div>
       </div>
-
-      <!-- review text -->
       <div class="mt-4">
         <div class="text-sm font-semibold text-[#6d2f1d] mb-2">Review</div>
         <textarea id="reviewText" class="textarea textarea-bordered w-full rounded-2xl border-[#d8ccb9] h-28" placeholder="Write your review..."></textarea>
       </div>
-
       <div class="modal-action">
         <form method="dialog"><button class="btn fh-outline">Cancel</button></form>
         <button id="saveReview" class="btn fh-btn">Save Review</button>
@@ -95,60 +91,66 @@
     const empty=document.getElementById("empty"),list=document.getElementById("list"),reviewModal=document.getElementById("reviewModal"),reviewItem=document.getElementById("reviewItem"),reviewText=document.getElementById("reviewText"),saveReview=document.getElementById("saveReview");
     let currentReviewKey="",currentOrderId="",currentItemName="",currentItemLabel="",currentMenuId=0;
 
-    const notes=x=>itemNotes(x).length?`<div class="text-sm text-[#8b6b5c] mt-1">${itemNotes(x).join(" • ")}</div>`:"";
-    const reviewBox=r=>r?`<div class="mt-3 rounded-2xl border border-[#e6dac8] bg-[#faf6ef] p-3"><div class="text-orange-600 font-bold">${starText(+r.stars||0)}</div><div class="text-sm text-[#3d241a] mt-1">${r.text||"-"}</div></div>`:"";
-    function itemRow(x,o,rowIndex){
-      const reviewKey=`${o.dbId}-${x.menu_id||rowIndex}`,r=getReview(reviewKey);
-      return `<div class="py-3 border-b border-[#efe5d7] last:border-0 flex flex-col md:flex-row md:justify-between gap-3">
-        <div class="flex-1">
-          <div class="font-bold text-[#3d241a]">${itemLabel(x)}</div>
-          ${notes(x)}
-          ${reviewBox(r)}
-        </div>
-        <div class="text-sm md:text-right text-[#6d2f1d]">
-          <div>Qty: ${x.qty}</div>
-          <div>Unit: ${money(x.unitPrice)}</div>
-          <div class="font-bold text-orange-600">Total: ${money(x.totalPrice)}</div>
-          ${o.status==="DONE"?`<button onclick='openReview(${JSON.stringify(reviewKey)},${JSON.stringify(o.dbId)},${JSON.stringify(x.menu_id||0)},${JSON.stringify(x.name)},${JSON.stringify(itemLabel(x))})' class="btn btn-sm mt-3 ${r?"fh-outline":"fh-btn"}">${r?"Edit Review":"Review"}</button>`:""}
-        </div>
-      </div>`;
-    }
-    const card=o=>`<div class="fh-card"><div class="p-6">
-      <div class="flex flex-col md:flex-row md:justify-between gap-3">
-        <div>
-          <div class="flex flex-wrap items-center gap-2"><h2 class="text-2xl font-extrabold text-[#3d241a]">${o.id}</h2><span class="badge ${statusBadge(o.status)}">${o.status}</span></div>
-          <div class="text-sm text-[#8b6b5c] mt-1">Time: ${o.time}</div>
-        </div>
-        <div class="md:text-right"><div class="text-sm text-[#8b6b5c]">Order Total</div><div class="text-3xl font-extrabold text-orange-600">${money(o.total)}</div></div>
-      </div>
-      <div class="divider my-2"></div>
-      ${o.items.map((x,i)=>itemRow(x,o,i)).join("")}
-    </div></div>`;
-
-    async function goOrderPage(){
-      localStorage.removeItem("selectedMenuItem");
-      try{
-        await syncCustomerMenuFromDB();
-      }catch(_){}
-      window.location.href="customer-dashboard.html";
-    }
-
-    function render(){
-      const a=[...getMyCustomerOrders()].sort((x,y)=>new Date(y.time)-new Date(x.time));
-      empty.classList.toggle("hidden",!!a.length);
-      list.innerHTML=a.map(card).join("");
-      const totalOrders=a.length;
-      const totalItems=a.reduce((sum,o)=>sum+(o.items||[]).reduce((s,i)=>s+Number(i.qty||0),0),0);
-      const grandTotal=a.reduce((sum,o)=>sum+Number(o.total||0),0);
-      document.getElementById("sum-orders").textContent=String(totalOrders);
-      document.getElementById("sum-items").textContent=String(totalItems);
-      document.getElementById("sum-total").textContent=money(grandTotal);
-      updateBadges();
+    async function hydrateReviewMapFromDB(orders){
+      const map=JSON.parse(localStorage.getItem("review_map")||"{}");
+      const session=getCustomerSession()||{};
+      const tableId=Number(session.table_id||0);
+      const customerName=encodeURIComponent(String(session.name||"").trim());
+      const menuIds=[...new Set((orders||[]).flatMap(o=>(o.items||[]).map(i=>Number(i.menu_id||0)).filter(Boolean)))];
+      await Promise.all(menuIds.map(async(menuId)=>{
+        try{
+          const rows=await apiGet(`/api/customer/reviews?menu_id=${menuId}&table_id=${tableId}&customer_name=${customerName}`);
+          (rows||[]).forEach((r)=>{
+            const key=`${r.order_id}-${r.menu_id}`;
+            map[key]={stars:Number(r.stars||0),text:r.text||"",time:r.time?new Date(r.time).toLocaleString():"-"};
+          });
+        }catch(_){}
+      }));
+      localStorage.setItem("review_map",JSON.stringify(map));
+      return map;
     }
 
     function setStars(n){
       document.querySelectorAll('[name="reviewStars"]').forEach(x=>x.checked=+x.value===+n);
     }
+    function rowView(o,x,rowIndex){
+      const reviewKey=`${o.dbId}-${x.menu_id||rowIndex}`,r=getReview(reviewKey);
+      const noteLines=itemNotes(x);
+      return `<div class="fh-card">
+        <div class="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div class="flex-1">
+            <div class="text-sm text-[#8b6b5c]">Order ${o.id}</div>
+            <h3 class="text-xl font-bold text-[#3d241a]">${itemLabel(x)}</h3>
+            <div class="text-sm text-[#8b6b5c] mt-1">Qty ${x.qty} • ${money(x.totalPrice)}</div>
+            ${noteLines.length?`<div class="text-sm text-[#8b6b5c] mt-2">${noteLines.join(" • ")}</div>`:""}
+            ${r?`<div class="mt-3 rounded-2xl border border-[#e6dac8] bg-[#faf6ef] p-3"><div class="text-orange-600 font-bold">${starText(+r.stars||0)}</div><div class="text-sm text-[#3d241a] mt-1">${r.text||"-"}</div><div class="text-xs text-[#8b6b5c] mt-1">${r.time||"-"}</div></div>`:"<div class='text-sm text-[#8b6b5c] mt-3'>No review yet</div>"}
+          </div>
+          <div>
+            <button onclick='openReview(${JSON.stringify(reviewKey)},${JSON.stringify(o.dbId)},${JSON.stringify(x.menu_id||0)},${JSON.stringify(x.name)},${JSON.stringify(itemLabel(x))})' class="btn ${r?"fh-outline":"fh-btn"}">${r?"Edit Review":"Write Review"}</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function render(){
+      const doneOrders=getMyCustomerOrders()
+        .filter((o)=>String(o.status||"").toUpperCase()==="DONE")
+        .sort((a,b)=>new Date(b.time)-new Date(a.time));
+      const rows=[];
+      doneOrders.forEach((o)=>{(o.items||[]).forEach((x,i)=>rows.push({order:o,item:x,rowIndex:i}))});
+      empty.classList.toggle("hidden",rows.length>0);
+      list.innerHTML=rows.map((r)=>rowView(r.order,r.item,r.rowIndex)).join("");
+
+      const reviewRows=rows.map((r)=>getReview(`${r.order.dbId}-${r.item.menu_id||r.rowIndex}`)).filter(Boolean);
+      const reviewed=reviewRows.length;
+      const pending=Math.max(0,rows.length-reviewed);
+      const avg=reviewed?(reviewRows.reduce((sum,r)=>sum+Number(r.stars||0),0)/reviewed).toFixed(1):"0.0";
+      document.getElementById("sum-reviewed").textContent=String(reviewed);
+      document.getElementById("sum-pending").textContent=String(pending);
+      document.getElementById("sum-avg").textContent=avg;
+      updateBadges();
+    }
+
     function openReview(reviewKey,orderId,menuId,itemName,itemLabelText){
       currentReviewKey=reviewKey;currentOrderId=orderId;currentMenuId=menuId;currentItemName=itemName;currentItemLabel=itemLabelText;
       const r=getReview(reviewKey);
@@ -172,10 +174,12 @@
       render();
     };
 
-    syncCustomerOrdersFromDB().finally(render);
-    setInterval(render,2000);
-    document.getElementById("order-more-btn").onclick=goOrderPage;
-    document.getElementById("order-empty-btn").onclick=goOrderPage;
+    (async()=>{
+      try{await syncCustomerOrdersFromDB();}catch(_){}
+      await hydrateReviewMapFromDB(getMyCustomerOrders());
+      render();
+    })();
+    setInterval(render,3000);
     window.openReview=openReview;
   </script>
 </body>

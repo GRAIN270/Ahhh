@@ -126,23 +126,33 @@
       return Math.max(0, Math.floor((Date.now() - t.getTime()) / 60000));
     }
 
+    function isToday(value) {
+      const d = new Date(value || '');
+      if (Number.isNaN(d.getTime())) return false;
+      const n = new Date();
+      return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+    }
+
     async function updateDashboard() {
       try {
-        const [queue, orders, reviews] = await Promise.all([
+        const [, orders, reviews] = await Promise.all([
           apiGet('/api/cook/queue'),
           apiGet('/api/admin/orders'),
           apiGet('/api/admin/reviews')
         ]);
 
-        const pending = (queue || []).filter(i => i.item_status === 'PENDING');
-        const cooking = (queue || []).filter(i => i.item_status === 'COOKING');
-        const ready = (orders || []).flatMap(o => o.items || []).filter(i => i.item_status === 'READY');
+        const todayOrders = (orders || []).filter((o) => isToday(o.time));
+        const todayItems = todayOrders.flatMap((o) => o.items || []);
+
+        const pending = todayItems.filter(i => i.item_status === 'PENDING');
+        const cooking = todayItems.filter(i => i.item_status === 'COOKING');
+        const ready = todayItems.filter(i => i.item_status === 'READY');
 
         document.getElementById("pendingCount").textContent = String(pending.length);
         document.getElementById("cookingCount").textContent = String(cooking.length);
         document.getElementById("readyCount").textContent = String(ready.length);
 
-        const activeOrders = (orders || []).filter(o => ['PENDING', 'COOKING', 'SERVING'].includes(o.status));
+        const activeOrders = todayOrders.filter(o => ['PENDING', 'COOKING', 'SERVING'].includes(o.status));
         document.getElementById("activeOrders").textContent = String(activeOrders.length);
 
         const menuCount = {};
@@ -161,7 +171,7 @@
         const syncText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         document.getElementById("lastSyncText").textContent = `Last sync: ${syncText}`;
 
-        const alertRows = (orders || [])
+        const alertRows = todayOrders
           .flatMap((o) => (o.items || []).map((i) => ({ ...i, _order: o })))
           .filter((i) => ['PENDING', 'COOKING'].includes(i.item_status))
           .map((i) => ({ ...i, wait: waitMinutes(i?._order?.time) }))
@@ -183,7 +193,7 @@
           : '<tr><td colspan="5" class="opacity-50">No critical queue right now.</td></tr>';
 
         const tbody = document.getElementById("reviewBody");
-        const rows = (reviews || []).slice(0, 6);
+        const rows = (reviews || []).filter((r) => isToday(r.time)).slice(0, 6);
         tbody.innerHTML = rows.length
           ? rows.map(r => `<tr><td>${r.order_id || '-'}</td><td>${r.menu || '-'}</td><td>${r.rating || 0}/5</td><td>${r.comment || '-'}</td></tr>`).join('')
           : '<tr><td colspan="4" class="opacity-50">No reviews</td></tr>';

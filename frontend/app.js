@@ -40,7 +40,7 @@ function money(n) {
 
 function starText(stars) {
   const s = Math.max(0, Math.min(5, Number(stars || 0)));
-  return `${'?'.repeat(s)}${'?'.repeat(5 - s)}`;
+  return `${'\u2605'.repeat(s)}${'\u2606'.repeat(5 - s)}`;
 }
 
 function statusBadge(status = '') {
@@ -228,7 +228,8 @@ function requireCustomerSession() {
 async function syncCustomerOrdersFromDB() {
   const session = getCustomerSession();
   const tableId = Number(session?.table_id || 1);
-  const rows = await apiGet(`/api/customer/orders?table_id=${tableId}`);
+  const customerName = encodeURIComponent(String(session?.name || '').trim());
+  const rows = await apiGet(`/api/customer/orders?table_id=${tableId}&customer_name=${customerName}`);
   const orders = (rows || []).map((o) => ({
     id: `ORD-${String(o.id).padStart(5, '0')}`,
     dbId: o.id,
@@ -290,6 +291,46 @@ function getReviews() { return store.read('reviews_admin'); }
 function getAttendance() { return store.read('attendance'); }
 function getCustomerMenuBundle() { return store.read('customer_menu_bundle', []); }
 function getCustomerOrders() { return store.read('customer_orders', []); }
+
+function customerScopeKey() {
+  const session = getCustomerSession() || {};
+  const tableId = Number(session.table_id || 0);
+  const name = String(session.name || '').trim().toLowerCase();
+  return `${tableId}|${name}`;
+}
+
+function getCustomerOrderIdsByUser() {
+  return store.read('customer_order_ids_by_user', {});
+}
+
+function saveCustomerOrderIdsByUser(nextMap) {
+  store.write('customer_order_ids_by_user', nextMap || {});
+}
+
+function rememberMyOrderId(orderId) {
+  const id = Number(orderId || 0);
+  if (!id) return;
+  const scope = customerScopeKey();
+  if (!scope) return;
+  const map = getCustomerOrderIdsByUser();
+  const prev = Array.isArray(map[scope]) ? map[scope] : [];
+  if (!prev.includes(id)) {
+    map[scope] = [...prev, id];
+    saveCustomerOrderIdsByUser(map);
+  }
+}
+
+function getMyCustomerOrderIds() {
+  const scope = customerScopeKey();
+  const map = getCustomerOrderIdsByUser();
+  return Array.isArray(map[scope]) ? map[scope] : [];
+}
+
+function getMyCustomerOrders() {
+  const myIds = new Set(getMyCustomerOrderIds().map((x) => Number(x || 0)));
+  if (!myIds.size) return getCustomerOrders();
+  return getCustomerOrders().filter((o) => myIds.has(Number(o.dbId || o.id || 0)));
+}
 
 function saveMenus(nextMenus) {
   store.write('menus', nextMenus || []);
@@ -459,7 +500,9 @@ async function addReview(payload = {}) {
     order_id: orderId,
     menu_id: menuId,
     rating: stars,
-    comment: text
+    comment: text,
+    table_id: Number(getCustomerSession()?.table_id || 0),
+    customer_name: String(getCustomerSession()?.name || '').trim()
   });
 
   const map = store.read('review_map', {});
@@ -470,7 +513,7 @@ async function addReview(payload = {}) {
 }
 
 function menuReviews(menuName) {
-  const orders = getCustomerOrders();
+  const orders = getMyCustomerOrders();
   const map = store.read('review_map', {});
   const rows = [];
   for (const order of orders) {
@@ -505,6 +548,7 @@ async function pushOrder(method, info = {}) {
 
   const payload = {
     table_id: Number(session.table_id || 1),
+    customer_name: String(session.name || '').trim(),
     method,
     payment_detail: info.summary || '',
     items: cart.map((item) => ({
@@ -518,6 +562,7 @@ async function pushOrder(method, info = {}) {
   };
 
   const result = await apiSend('/api/customer/checkout', 'POST', payload);
+  rememberMyOrderId(result.order_id);
   saveCart([]);
   updateBadges();
   await syncCustomerOrdersFromDB();
@@ -540,6 +585,8 @@ window.getReviews = getReviews;
 window.getAttendance = getAttendance;
 window.getCustomerMenuBundle = getCustomerMenuBundle;
 window.getCustomerOrders = getCustomerOrders;
+window.getMyCustomerOrders = getMyCustomerOrders;
+window.getMyCustomerOrderIds = getMyCustomerOrderIds;
 window.syncCustomerMenuFromDB = syncCustomerMenuFromDB;
 window.syncCustomerOrdersFromDB = syncCustomerOrdersFromDB;
 window.adminSidebar = adminSidebar;

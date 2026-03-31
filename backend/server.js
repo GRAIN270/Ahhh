@@ -24,6 +24,7 @@ const pool = mysql.createPool({
 let menuOptionHasTypeColumn = null;
 let menuOptionValueHasDefaultColumn = null;
 let menuOptionDefaultsEnsured = false;
+let ordersHasCustomerNameColumn = null;
 
 const webRootDir = path.join(__dirname, '..');
 app.use(express.static(webRootDir));
@@ -35,10 +36,11 @@ const pageRoutes = {
   '/staff-login': 'frontend/login/staff-login.html',
 
   '/customer-dashboard': 'frontend/User/customer-dashboard.html',
+  '/customer-reviews': 'frontend/User/reviews.html',
   '/menu-detail': 'frontend/User/menu-detail.html',
   '/cart': 'frontend/User/cart.html',
   '/my-orders': 'frontend/User/my-orders.html',
-  '/payment': 'frontend/User/payment.html',
+  '/payment': 'frontend/User/cart.html',
 
   '/admin': 'frontend/admin/dashboard_Admin.html',
   '/admin/dashboard': 'frontend/admin/dashboard_Admin.html',
@@ -60,6 +62,14 @@ const pageRoutes = {
 
 Object.entries(pageRoutes).forEach(([route, relativePath]) => {
   app.get(route, (_req, res) => {
+    res.sendFile(path.join(webRootDir, relativePath));
+  });
+});
+
+// Convenience aliases: allow "/page-name.html" in addition to "/page-name"
+Object.entries(pageRoutes).forEach(([route, relativePath]) => {
+  if (route === '/' || route.endsWith('.html')) return;
+  app.get(`${route}.html`, (_req, res) => {
     res.sendFile(path.join(webRootDir, relativePath));
   });
 });
@@ -265,6 +275,64 @@ async function ensureMenuOptionDefaults() {
   }
 }
 
+async function ensureOrdersCustomerColumn() {
+  if (ordersHasCustomerNameColumn !== null) return;
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.query(
+      `SELECT 1
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'orders'
+         AND COLUMN_NAME = 'customer_name'
+       LIMIT 1`
+    );
+    if (!rows.length) {
+      await conn.query('ALTER TABLE orders ADD COLUMN customer_name VARCHAR(120) NULL AFTER table_id');
+      await conn.query('CREATE INDEX idx_orders_table_customer ON orders (table_id, customer_name)');
+      ordersHasCustomerNameColumn = true;
+      return;
+    }
+    ordersHasCustomerNameColumn = true;
+  } catch (err) {
+    console.warn('Ensure orders.customer_name failed:', err.message);
+    ordersHasCustomerNameColumn = false;
+  } finally {
+    conn.release();
+  }
+}
+
+async function syncOrderStatusFromItems(conn, orderId) {
+  const [orderRows] = await conn.query(
+    'SELECT status FROM orders WHERE order_id = ? LIMIT 1',
+    [orderId]
+  );
+  const currentOrder = orderRows[0];
+  if (!currentOrder) return;
+
+  const currentStatus = String(currentOrder.status || '').toUpperCase();
+  if (currentStatus === 'DONE' || currentStatus === 'CANCELLED') return;
+
+  const [items] = await conn.query(
+    'SELECT item_status FROM order_item WHERE order_id = ?',
+    [orderId]
+  );
+  if (!items.length) return;
+
+  const statuses = items.map((x) => String(x.item_status || 'PENDING').toUpperCase());
+  const has = (s) => statuses.includes(s);
+
+  let nextStatus = 'PENDING';
+  if (has('COOKING')) nextStatus = 'COOKING';
+  else if (has('READY') || has('SERVED')) nextStatus = 'SERVING';
+  else nextStatus = 'PENDING';
+
+  await conn.query(
+    'UPDATE orders SET status = ? WHERE order_id = ?',
+    [nextStatus, orderId]
+  );
+}
+
 async function getMenuBundle() {
   await ensureMenuOptionDefaults();
 
@@ -404,16 +472,27 @@ app.get('/api/customer/menu', async (req, res) => {
 
 app.get('/api/customer/reviews', async (req, res) => {
   const menuId = Number(req.query.menu_id || 0);
+  const tableId = Number(req.query.table_id || 0);
+  const customerName = String(req.query.customer_name || '').trim();
   if (!menuId) return res.status(400).json({ error: 'menu_id is required' });
 
   try {
+    await ensureOrdersCustomerColumn();
+    if (!tableId || !customerName) {
+      return res.status(400).json({ error: 'table_id and customer_name are required' });
+    }
     const [rows] = await pool.query(
       `SELECT r.review_id, r.order_id, r.menu_id, r.rating, r.comment, r.created_at, m.name_menu
        FROM review r
+       JOIN orders o ON o.order_id = r.order_id
        JOIN menu m ON m.menu_id = r.menu_id
        WHERE r.menu_id = ?
+         AND o.table_id = ?
+         ${ordersHasCustomerNameColumn ? 'AND o.customer_name = ?' : ''}
        ORDER BY r.created_at DESC`,
-      [menuId]
+      ordersHasCustomerNameColumn
+        ? [menuId, tableId, customerName]
+        : [menuId, tableId]
     );
     res.json(rows.map((r) => ({
       review_id: r.review_id,
@@ -430,12 +509,33 @@ app.get('/api/customer/reviews', async (req, res) => {
 });
 
 app.post('/api/customer/reviews', async (req, res) => {
-  const { order_id, menu_id, rating, comment } = req.body;
+  const { order_id, menu_id, rating, comment, table_id, customer_name } = req.body;
   if (!order_id || !menu_id || !rating) {
     return res.status(400).json({ error: 'order_id, menu_id and rating are required' });
   }
 
   try {
+    await ensureOrdersCustomerColumn();
+    const tableId = Number(table_id || 0);
+    const customerName = String(customer_name || '').trim();
+    if (!tableId || !customerName) {
+      return res.status(400).json({ error: 'table_id and customer_name are required' });
+    }
+
+    const [ownRows] = await pool.query(
+      `SELECT 1 FROM orders
+       WHERE order_id = ?
+         AND table_id = ?
+         ${ordersHasCustomerNameColumn ? 'AND customer_name = ?' : ''}
+       LIMIT 1`,
+      ordersHasCustomerNameColumn
+        ? [Number(order_id), tableId, customerName]
+        : [Number(order_id), tableId]
+    );
+    if (!ownRows.length) {
+      return res.status(403).json({ error: 'You can review only your own order items' });
+    }
+
     await pool.query(
       `INSERT INTO review (order_id, menu_id, rating, comment)
        VALUES (?, ?, ?, ?)
@@ -451,6 +551,7 @@ app.post('/api/customer/reviews', async (req, res) => {
 app.post('/api/customer/checkout', async (req, res) => {
   const {
     table_id = 1,
+    customer_name = '',
     method = 'CASH',
     payment_detail = '',
     items = []
@@ -462,11 +563,17 @@ app.post('/api/customer/checkout', async (req, res) => {
 
   const conn = await pool.getConnection();
   try {
+    await ensureOrdersCustomerColumn();
     await conn.beginTransaction();
 
+    const customerName = String(customer_name || '').trim();
+    if (!customerName) throw new Error('customer_name is required');
+
     const [orderResult] = await conn.query(
-      'INSERT INTO orders (table_id, status) VALUES (?, "PENDING")',
-      [table_id]
+      ordersHasCustomerNameColumn
+        ? 'INSERT INTO orders (table_id, customer_name, status) VALUES (?, ?, "PENDING")'
+        : 'INSERT INTO orders (table_id, status) VALUES (?, "PENDING")',
+      ordersHasCustomerNameColumn ? [table_id, customerName] : [table_id]
     );
     const orderId = orderResult.insertId;
 
@@ -524,16 +631,20 @@ app.post('/api/customer/checkout', async (req, res) => {
 
 app.get('/api/customer/orders', async (req, res) => {
   const tableId = Number(req.query.table_id || 1);
+  const customerName = String(req.query.customer_name || '').trim();
 
   try {
+    await ensureOrdersCustomerColumn();
+    if (!customerName) return res.status(400).json({ error: 'customer_name is required' });
     const [orders] = await pool.query(
       `SELECT o.order_id, o.status, o.order_time, o.total_price,
               p.method, p.payment_time
        FROM orders o
        LEFT JOIN payment p ON p.order_id = o.order_id
        WHERE o.table_id = ?
+         ${ordersHasCustomerNameColumn ? 'AND o.customer_name = ?' : ''}
        ORDER BY o.order_id DESC`,
-      [tableId]
+      ordersHasCustomerNameColumn ? [tableId, customerName] : [tableId]
     );
 
     if (!orders.length) return res.json([]);
@@ -642,9 +753,42 @@ app.get('/api/cook/queue', async (req, res) => {
 });
 
 app.patch('/api/cook/items/:id', async (req, res) => {
-  const { item_status } = req.body;
-  await pool.query('UPDATE order_item SET item_status = ? WHERE order_item_id = ?', [item_status, req.params.id]);
-  res.json({ message: 'Status updated' });
+  const { item_status } = req.body || {};
+  const nextItemStatus = String(item_status || '').toUpperCase();
+  const allowed = new Set(['PENDING', 'COOKING', 'READY', 'SERVED']);
+  if (!allowed.has(nextItemStatus)) {
+    return res.status(400).json({ error: 'Invalid item_status' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [itemRows] = await conn.query(
+      'SELECT order_id FROM order_item WHERE order_item_id = ? LIMIT 1',
+      [req.params.id]
+    );
+    const item = itemRows[0];
+    if (!item) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Order item not found' });
+    }
+
+    await conn.query(
+      'UPDATE order_item SET item_status = ? WHERE order_item_id = ?',
+      [nextItemStatus, req.params.id]
+    );
+
+    await syncOrderStatusFromItems(conn, item.order_id);
+
+    await conn.commit();
+    res.json({ message: 'Status updated' });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ error: err.message });
+  } finally {
+    conn.release();
+  }
 });
 
 app.post('/api/admin/pay', async (req, res) => {

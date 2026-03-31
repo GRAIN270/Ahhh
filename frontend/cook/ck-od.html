@@ -95,6 +95,13 @@
       return Math.max(0, Math.floor(diff / 60000));
     }
 
+    function isToday(value) {
+      const d = new Date(value || '');
+      if (Number.isNaN(d.getTime())) return false;
+      const n = new Date();
+      return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+    }
+
     function urgency(waitMins) {
       if (waitMins >= 20) return '<span class="badge badge-sm badge-error">Urgent</span>';
       if (waitMins >= 10) return '<span class="badge badge-sm badge-warning">Soon</span>';
@@ -163,22 +170,23 @@
             waitMins: waitMinutes(o.time)
           };
         });
+        const todayOrders = enrichedOrders.filter((o) => isToday(o.time));
 
-        document.getElementById('pendingCount').textContent = String(enrichedOrders.filter(o => o.hasPending && !o.allServed).length);
-        document.getElementById('cookingCount').textContent = String(enrichedOrders.filter(o => o.hasCooking && !o.allServed).length);
-        document.getElementById('readyCount').textContent = String(enrichedOrders.filter(o => o.hasReady && !o.allServed).length);
+        document.getElementById('pendingCount').textContent = String(todayOrders.filter(o => o.hasPending && !o.allServed).length);
+        document.getElementById('cookingCount').textContent = String(todayOrders.filter(o => o.hasCooking && !o.allServed).length);
+        document.getElementById('readyCount').textContent = String(todayOrders.filter(o => o.hasReady && !o.allServed).length);
 
         let byStatus = [];
         if (currentFilter === 'HISTORY') {
-          byStatus = enrichedOrders.filter(o => o.allServed);
+          byStatus = todayOrders.filter(o => o.allServed);
         } else if (currentFilter === 'all') {
-          byStatus = enrichedOrders.filter(o => !o.allServed);
+          byStatus = todayOrders.filter(o => !o.allServed);
         } else if (currentFilter === 'PENDING') {
-          byStatus = enrichedOrders.filter(o => o.hasPending && !o.allServed);
+          byStatus = todayOrders.filter(o => o.hasPending && !o.allServed);
         } else if (currentFilter === 'COOKING') {
-          byStatus = enrichedOrders.filter(o => o.hasCooking && !o.allServed);
+          byStatus = todayOrders.filter(o => o.hasCooking && !o.allServed);
         } else if (currentFilter === 'READY') {
-          byStatus = enrichedOrders.filter(o => o.hasReady && !o.allServed);
+          byStatus = todayOrders.filter(o => o.hasReady && !o.allServed);
         }
         const filtered = filterBySearch(byStatus);
 

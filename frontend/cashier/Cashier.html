@@ -200,6 +200,12 @@
     let isOtherVerified = false;
 
     const nextItemStatus = (s) => s === 'READY' ? 'SERVED' : (s === 'COOKING' ? 'READY' : (s === 'PENDING' ? 'COOKING' : s));
+    const isToday = (value) => {
+      const d = new Date(value || '');
+      if (Number.isNaN(d.getTime())) return false;
+      const n = new Date();
+      return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+    };
 
     async function loadData() {
       try {
@@ -208,7 +214,7 @@
           apiGet('/api/admin/orders')
         ]);
 
-        allOrders = Array.isArray(orders) ? orders : [];
+        allOrders = (Array.isArray(orders) ? orders : []).filter((o) => isToday(o.time));
         tablesData = {};
         tableNumbers = [];
 

@@ -32,6 +32,7 @@
         </div>
       </a>
       <a href="my-orders.html" class="btn fh-outline">Orders</a>
+      <a href="/customer-reviews" class="btn fh-outline">Reviews</a>
     </div>
   </div>
 
@@ -96,14 +97,6 @@
     let q = "";
     let items = [];
 
-    const toast = (m) => {
-      const e = document.createElement("div");
-      e.className = "toast toast-top toast-end z-[9999]";
-      e.innerHTML = `<div class="alert alert-success"><span>${m}</span></div>`;
-      document.body.appendChild(e);
-      setTimeout(() => e.remove(), 1200);
-    };
-
     function buildFromBundle(bundle) {
       const iconPool = ["🍛", "🍜", "🍟", "🥤", "🍰", "🍽️", "🥗", "🍲"];
       cats = bundle.map((cat, idx) => {
@@ -141,7 +134,7 @@
           <div class="flex items-start justify-between gap-3"><div><h3 class="card-title text-lg text-[#3d241a]">${x.name}</h3><p class="text-xs text-[#6d2f1d]/60">${x.desc || "-"}</p></div><div class="badge badge-outline border-orange-300 text-orange-700">${money(x.price)}</div></div>
           <div class="flex items-center justify-between mt-3"><span class="badge bg-orange-100 text-orange-700 border-0">${x.tag || x.categoryLabel}</span><span class="text-xs text-[#6d2f1d]/60">⭐ ${avgReview(x.name)}</span></div>
           ${q ? `<div class="text-xs text-[#8b6b5c] mt-2">Category: ${x.categoryLabel}</div>` : ""}
-          <div class="card-actions justify-between mt-4"><button onclick="customize(${i})" class="btn btn-outline btn-sm rounded-full border-[#c8b39b] text-[#6d2f1d]">Customize</button><button onclick="quickAdd(${i})" class="btn btn-sm rounded-full bg-orange-600 hover:bg-orange-700 text-white border-0">Add</button></div>
+          <div class="card-actions justify-end mt-4"><button onclick="customize(${i})" class="btn btn-outline btn-sm rounded-full border-[#c8b39b] text-[#6d2f1d]">Customize</button></div>
         </div>
       </div>`;
     }
@@ -163,7 +156,6 @@
 
     function pick(k) { active = k; q = ""; search1.value = ""; search2.value = ""; render(); }
     function customize(i) { localStorage.setItem("selectedMenuItem", JSON.stringify(items[i])); location.href = "menu-detail.html"; }
-    function quickAdd(i) { addBasicItem(items[i]); toast("Added to cart"); }
     function doSearch(v) { q = v.trim().toLowerCase(); search1.value = v; search2.value = v; render(); }
 
     async function init() {
@@ -181,7 +173,6 @@
     search2.addEventListener("input", (e) => doSearch(e.target.value));
     window.pick = pick;
     window.customize = customize;
-    window.quickAdd = quickAdd;
     init();
   </script>
 </body>
